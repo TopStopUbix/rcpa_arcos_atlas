@@ -8,9 +8,10 @@
       body {
         height: 100%;
         margin: 0;
-        background: #111;
+        background: #0d1117;
         color: #e6edf3;
-        font-family: system-ui, sans-serif;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
       }
       #wrap {
         height: 100%;
@@ -24,29 +25,28 @@
 
       #crumbs {
         display: flex;
-        gap: 6px;
+        gap: 8px;
         align-items: center;
         padding: 10px 12px;
       }
-      #crumbs button {
-        background: #161b22;
-        color: #e6edf3;
-        border: 1px solid #30363d;
-        border-radius: 6px;
-        padding: 5px 10px;
+      #crumbs a {
+        color: var(--link-color);
+        text-decoration: none;
         cursor: pointer;
-        font: inherit;
       }
-      #crumbs button:hover:not(:disabled) {
-        border-color: #58a6ff;
-      }
-      #crumbs button:disabled {
-        color: #8b949e;
-        cursor: default;
+      #crumbs .current {
+        color: #e6edf3;
       }
       #crumbs .sep {
         color: #484f58;
       }
+
+      a:hover {
+        text-decoration: underline;
+        background-color: blue;
+        color: yellow;
+      }
+
       .shape {
         fill: #111;
         stroke: #fff;
@@ -153,14 +153,21 @@
 
         trail.forEach((step, i) => {
           if (i > 0) nav.append('span').attr('class', 'sep').text('›');
-          nav
-            .append('button')
-            .text(step.text)
-            .property('disabled', i === trail.length - 1)
-            .on('click', () => {
-              step.go();
-              render();
-            });
+
+          if (i === trail.length - 1) {
+            // current level: plain text, not clickable
+            nav.append('span').attr('class', 'current').text(step.text);
+          } else {
+            nav
+              .append('a')
+              .attr('href', '#')
+              .text(step.text)
+              .on('click', (e) => {
+                e.preventDefault();
+                step.go();
+                render();
+              });
+          }
         });
       }
 
