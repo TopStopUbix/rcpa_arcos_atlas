@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>D3 GeoJSON</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #111;
+        color: #e6edf3;
+        font-family: system-ui, sans-serif;
+      }
+      #wrap {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+      #map {
+        flex: 1;
+        width: 100%;
+      }
+
+      #crumbs {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        padding: 10px 12px;
+      }
+      #crumbs button {
+        background: #161b22;
+        color: #e6edf3;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 5px 10px;
+        cursor: pointer;
+        font: inherit;
+      }
+      #crumbs button:hover:not(:disabled) {
+        border-color: #58a6ff;
+      }
+      #crumbs button:disabled {
+        color: #8b949e;
+        cursor: default;
+      }
+      #crumbs .sep {
+        color: #484f58;
+      }
+      .shape {
+        fill: #111;
+        stroke: #fff;
+        stroke-width: 0.6;
+        vector-effect: non-scaling-stroke;
+        cursor: pointer;
+      }
+      .shape.hl {
+        fill: #fff;
+      }
+      .shape.static {
+        cursor: default;
+      }
+      .label {
+        fill: #fff;
+        paint-order: stroke;
+        stroke: #000;
+        stroke-width: 3px;
+        stroke-linejoin: round;
+        pointer-events: none;
+        text-anchor: middle;
+      }
+      #error {
+        display: none;
+        margin: 12px;
+        padding: 10px 14px;
+        background: #3d1418;
+        border: 1px solid #f85149;
+        border-radius: 6px;
+        color: #ffa198;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="wrap">
+      <nav id="crumbs"></nav>
+      <div id="error"></div>
+      <svg id="map"></svg>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+    <script>
+      function showError(msg) {
+        const el = document.getElementById('error');
+        el.textContent = msg;
+        el.style.display = 'block';
+      }
+
+      // Left side lowercase (used by the code), right side must match your file's keys exactly
+      const CFG = { region: 'Region', subregion: 'Subregion', name: 'Name' };
+      const state = { region: null, subregion: null };
+
+      // Treats null, undefined and blank strings as missing
+      const clean = (v) =>
+        v == null || String(v).trim() === '' ? null : String(v).trim();
+      const get = (f, key) => clean(f.properties?.[key]);
+
+      function regionHasSubregions(region) {
+        return data.features.some(
+          (f) =>
+            (get(f, CFG.region) ?? 'Unknown') === region &&
+            get(f, CFG.subregion)
+        );
+      }
+
+      // 0 = global, 1 = region (by subregion), 2 = countries.
+      // A region with no subregion values skips straight to level 2.
+      function currentLevel() {
+        if (!state.region) return 0;
+        if (!state.subregion && regionHasSubregions(state.region)) return 1;
+        return 2;
+      }
+
+      function currentFeatures() {
+        if (!state.region) return data.features;
+        return data.features.filter(
+          (f) =>
+            (get(f, CFG.region) ?? 'Unknown') === state.region &&
+            (!state.subregion || get(f, CFG.subregion) === state.subregion)
+        );
+      }
+
+      function updateCrumbs() {
+        const nav = d3.select('#crumbs');
+        nav.selectAll('*').remove();
+
+        const trail = [
+          {
+            text: 'Global',
+            go: () => {
+              state.region = null;
+              state.subregion = null;
+            },
+          },
+        ];
+        if (state.region)
+          trail.push({
+            text: state.region,
+            go: () => {
+              state.subregion = null;
+            },
+          });
+        if (state.subregion) trail.push({ text: state.subregion, go: null });
+
+        trail.forEach((step, i) => {
+          if (i > 0) nav.append('span').attr('class', 'sep').text('›');
+          nav
+            .append('button')
+            .text(step.text)
+            .property('disabled', i === trail.length - 1)
+            .on('click', () => {
+              step.go();
+              render();
+            });
+        });
+      }
+
+      // Keys are Region or Subregion values, spelled exactly as in your file.
+      const OVERRIDES = {
+        EU: () => d3.geoConicEquidistant().rotate([48, -10]),
+        EU1: () => d3.geoConicConformal().rotate([15, -50]),
+        EU5: () => d3.geoOrthographic().rotate([90, -45]),
+        EA: () => d3.geoConicEquidistant().rotate([-90, -10]),
+        EA1: () => d3.geoConicEquidistant().rotate([-90, -10]),
+        VDT: () => d3.geoAlbersUsa(),
+        AT: () => d3.geoAzimuthalEqualArea().rotate([45, 90]),
+      };
+
+      // Centres the projection on the spherical centroid of whatever is being shown
+      const centred = (fc) => {
+        const [cx, cy] = d3.geoCentroid(fc);
+        return d3.geoAzimuthalEqualArea().rotate([-cx, -cy]);
+      };
+
+      function pickProjection(level, fc) {
+        const key = state.subregion ?? state.region;
+        if (key && OVERRIDES[key]) return OVERRIDES[key]();
+        if (level === 0) return d3.geoNaturalEarth1();
+        const [cx] = d3.geoCentroid(fc);
+        return d3.geoMercator().rotate([-cx, 0]);
+        // or: return centred(fc);   // use the geoCentroid approach for every region and subregion
+      }
+
+      function render() {
+        const svg = d3.select('#map');
+        const { width, height } = svg.node().getBoundingClientRect();
+        const level = currentLevel();
+
+        // What counts as "the same group" for hover highlighting and labels.
+        // At level 1, a country with no subregion is its own group.
+        const groupKey = (f) =>
+          level === 0
+            ? get(f, CFG.region) ?? 'Unknown'
+            : level === 1
+            ? get(f, CFG.subregion) ?? get(f, CFG.name)
+            : get(f, CFG.name);
+
+        const feats = currentFeatures();
+        const fc = { type: 'FeatureCollection', features: feats };
+        const projection = pickProjection(level, fc).fitSize(
+          [width, height],
+          fc
+        );
+        const path = d3.geoPath(projection);
+
+        svg.on('.zoom', null).selectAll('*').remove();
+        const g = svg.append('g');
+
+        g.selectAll('path')
+          .data(feats)
+          .join('path')
+          .attr('class', level === 2 ? 'shape static' : 'shape')
+          .attr('d', path)
+          .on('mouseenter', (e, d) => {
+            if (level === 2) return;
+            g.selectAll('.shape').classed(
+              'hl',
+              (x) => groupKey(x) === groupKey(d)
+            );
+          })
+          .on('mouseleave', () => g.selectAll('.shape').classed('hl', false))
+          .on('click', (e, d) => {
+            if (level === 0) {
+              state.region = get(d, CFG.region) ?? 'Unknown';
+              state.subregion = null;
+            } else if (level === 1) {
+              const sub = get(d, CFG.subregion);
+              if (!sub) return; // country with no subregion: nothing to drill into
+              state.subregion = sub;
+            } else return;
+            render();
+          })
+          .append('title')
+          .text((d) => (level === 2 ? get(d, CFG.name) : groupKey(d)));
+
+        const zoom = d3
+          .zoom()
+          .scaleExtent([1, 40])
+          .translateExtent([
+            [0, 0],
+            [width, height],
+          ])
+          .on('zoom', (e) => {
+            g.attr('transform', e.transform);
+          });
+        svg.call(zoom);
+
+        updateCrumbs();
+      }
+
+      let data;
+
+      function draw() {
+        try {
+          render();
+        } catch (err) {
+          showError('Could not render GeoJSON: ' + err.message);
+        }
+      }
+
+      function rewind(geom) {
+        const fix = (poly) =>
+          d3.geoArea({ type: 'Polygon', coordinates: poly }) > 2 * Math.PI
+            ? poly.map((ring) => ring.slice().reverse())
+            : poly;
+
+        if (geom.type === 'Polygon') geom.coordinates = fix(geom.coordinates);
+        else if (geom.type === 'MultiPolygon')
+          geom.coordinates = geom.coordinates.map(fix);
+      }
+
+      d3.json('data.geojson')
+        .then((json) => {
+          data = json;
+          data.features = data.features.filter((f) => f.geometry);
+          data.features.forEach((f) => rewind(f.geometry));
+
+          const props = data.features[0]?.properties ?? {};
+          for (const [label, key] of Object.entries(CFG)) {
+            if (!(key in props)) {
+              showError(
+                `Property "${key}" (CFG.${label}) not found. Available keys: ${Object.keys(
+                  props
+                ).join(', ')}`
+              );
+              return;
+            }
+          }
+
+          draw();
+          window.addEventListener('resize', draw);
+        })
+        .catch((err) =>
+          showError('Failed to load data.geojson: ' + err.message)
+        );
+    </script>
+  </body>
+</html>
