@@ -174,11 +174,38 @@
         EU: () => d3.geoConicEquidistant().rotate([48, -10]),
         EU1: () => d3.geoConicConformal().rotate([15, -50]),
         EU5: () => d3.geoOrthographic().rotate([90, -45]),
-        EA: () => d3.geoConicEquidistant().rotate([-90, -10]),
-        EA1: () => d3.geoConicEquidistant().rotate([-90, -10]),
+        EA: () => d3.geoOrthographic().rotate([-87, -57]),
+        EA1: () => d3.geoOrthographic().rotate([-87, -57]),
         VDT: () => d3.geoAlbersUsa(),
+        LA3: () => d3.geoOrthographic().rotate([60, 18]),
         AT: () => d3.geoAzimuthalEqualArea().rotate([45, 90]),
       };
+
+      // Optional per key. center is real-world [lon, lat] (west/south negative).
+      // radius is degrees from the centre to the edge of the frame. roll spins the map.
+      const FOCUS = {
+        AT: { center: [0, -90], radius: 35, roll: 0 }, // south pole in the middle, frame down to about 55°S
+      };
+
+      function makeProjection(level, fc, width, height) {
+        const key = [state.subregion, state.region].find(
+          (k) => k && OVERRIDES[k]
+        );
+        const projection = pickProjection(level, fc);
+        const focus = key && FOCUS[key];
+
+        if (!focus) return projection.fitSize([width, height], fc);
+
+        const [lon, lat] = focus.center;
+        projection
+          .rotate([-lon, -lat, focus.roll ?? 0])
+          .clipAngle(focus.radius + 5); // drops territories beyond the frame
+        const frame = d3
+          .geoCircle()
+          .center(focus.center)
+          .radius(focus.radius)();
+        return projection.fitSize([width, height], frame);
+      }
 
       // Centres the projection on the spherical centroid of whatever is being shown
       const centred = (fc) => {
@@ -211,10 +238,7 @@
 
         const feats = currentFeatures();
         const fc = { type: 'FeatureCollection', features: feats };
-        const projection = pickProjection(level, fc).fitSize(
-          [width, height],
-          fc
-        );
+        const projection = makeProjection(level, fc, width, height);
         const path = d3.geoPath(projection);
 
         svg.on('.zoom', null).selectAll('*').remove();
