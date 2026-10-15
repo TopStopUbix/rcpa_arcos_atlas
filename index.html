@@ -4,11 +4,15 @@
     <meta charset="UTF-8" />
     <title>D3 GeoJSON</title>
     <style>
+      :root {
+        --link-color: yellow;
+      }
+
       html,
       body {
         height: 100%;
         margin: 0;
-        background: #0d1117;
+        background: #111;
         color: #e6edf3;
         font-family: 'Courier New', monospace;
         font-size: 14px;
@@ -33,12 +37,6 @@
         color: var(--link-color);
         text-decoration: none;
         cursor: pointer;
-      }
-      #crumbs .current {
-        color: #e6edf3;
-      }
-      #crumbs .sep {
-        color: #484f58;
       }
 
       a:hover {
@@ -152,11 +150,11 @@
         if (state.subregion) trail.push({ text: state.subregion, go: null });
 
         trail.forEach((step, i) => {
-          if (i > 0) nav.append('span').attr('class', 'sep').text('›');
+          if (i > 0) nav.append('span').text('>');
 
           if (i === trail.length - 1) {
             // current level: plain text, not clickable
-            nav.append('span').attr('class', 'current').text(step.text);
+            nav.append('span').text(step.text);
           } else {
             nav
               .append('a')
