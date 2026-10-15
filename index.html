@@ -31,8 +31,10 @@
         display: flex;
         gap: 8px;
         align-items: center;
-        padding: 10px 12px;
+        padding: 0;
+        margin: 0;
       }
+      
       #crumbs a {
         color: var(--link-color);
         text-decoration: none;
@@ -174,8 +176,8 @@
         EU: () => d3.geoConicEquidistant().rotate([48, -10]),
         EU1: () => d3.geoConicConformal().rotate([15, -50]),
         EU5: () => d3.geoOrthographic().rotate([90, -45]),
-        EA: () => d3.geoOrthographic().rotate([-87, -57]),
-        EA1: () => d3.geoOrthographic().rotate([-87, -57]),
+        EA: () => d3.geoOrthographic().rotate([-84, -57]),
+        EA1: () => d3.geoOrthographic().rotate([-84, -57]),
         VDT: () => d3.geoAlbersUsa(),
         LA3: () => d3.geoOrthographic().rotate([60, 18]),
         AT: () => d3.geoAzimuthalEqualArea().rotate([45, 90]),
