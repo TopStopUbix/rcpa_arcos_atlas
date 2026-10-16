@@ -20,7 +20,7 @@
         font-size: 14px;
       }
       #wrap {
-        height: 40em;
+        height: 450px;
         display: flex;
         flex-direction: column;
       }
@@ -312,12 +312,18 @@
 
       function reportHeight() {
         if (window.parent === window) return;
+        const wrap = document
+          .getElementById('wrap')
+          .getBoundingClientRect().height;
         const blurb = document.getElementById('blurb');
         const h =
-          document.getElementById('wrap').getBoundingClientRect().height +
-          (blurb.hidden ? 0 : blurb.getBoundingClientRect().height);
+          wrap + (blurb.hidden ? 0 : blurb.getBoundingClientRect().height);
         window.parent.postMessage(
-          { type: 'atlas-height', height: Math.ceil(h) + 2 },
+          {
+            type: 'atlas-height',
+            height: Math.ceil(h),
+            dbg: `inner vh ${innerHeight} | doc ${document.documentElement.scrollHeight} | body ${document.body.scrollHeight} | wrap ${wrap}`,
+          },
           '*'
         );
       }
