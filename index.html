@@ -309,13 +309,13 @@
       }
 
       function reportHeight() {
-        if (window.parent === window) return; // standalone page: nothing to tell
+        if (window.parent === window) return;
         const blurb = document.getElementById('blurb');
         const h =
-          document.getElementById('wrap').offsetHeight +
-          (blurb.hidden ? 0 : blurb.offsetHeight);
+          document.getElementById('wrap').getBoundingClientRect().height +
+          (blurb.hidden ? 0 : blurb.getBoundingClientRect().height);
         window.parent.postMessage(
-          { type: 'atlas-height', height: Math.ceil(h) },
+          { type: 'atlas-height', height: Math.ceil(h) + 2 },
           '*'
         );
       }
