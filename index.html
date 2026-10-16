@@ -18,7 +18,7 @@
         font-size: 14px;
       }
       #wrap {
-        height: 100vh;
+        height: 600px;
         display: flex;
         flex-direction: column;
       }
@@ -308,6 +308,18 @@
         text.split(/\n\s*\n/).forEach((p) => box.append('p').text(p));
       }
 
+      function reportHeight() {
+        if (window.parent === window) return; // standalone page: nothing to tell
+        const blurb = document.getElementById('blurb');
+        const h =
+          document.getElementById('wrap').offsetHeight +
+          (blurb.hidden ? 0 : blurb.offsetHeight);
+        window.parent.postMessage(
+          { type: 'atlas-height', height: Math.ceil(h) },
+          '*'
+        );
+      }
+
       function render() {
         const svg = d3.select('#map');
         const { width, height } = svg.node().getBoundingClientRect();
@@ -417,6 +429,7 @@
 
         updateCrumbs();
         updateBlurb();
+        reportHeight();
       }
 
       let data;
