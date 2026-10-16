@@ -34,13 +34,11 @@
         padding: 0;
         margin: 0;
       }
-      
       #crumbs a {
         color: var(--link-color);
         text-decoration: none;
         cursor: pointer;
       }
-
       a:hover {
         text-decoration: underline;
         background-color: blue;
@@ -60,6 +58,7 @@
       .shape.static {
         cursor: default;
       }
+
       .label {
         fill: #fff;
         paint-order: stroke;
@@ -69,6 +68,28 @@
         pointer-events: none;
         text-anchor: middle;
       }
+      .pin {
+        cursor: pointer;
+      }
+      .pin rect {
+        fill: transparent;
+      }
+      .pin:hover rect {
+        fill: blue;
+      }
+      .pin .label {
+        fill: var(--link-color);
+        stroke: none;
+        font-size: 16px;
+        text-anchor: middle;
+        dominant-baseline: central;
+        pointer-events: none;
+      }
+      .pin:hover .label {
+        fill: yellow;
+        text-decoration: underline;
+      }
+
       #error {
         display: none;
         margin: 12px;
@@ -96,13 +117,21 @@
       }
 
       // Left side lowercase (used by the code), right side must match your file's keys exactly
-      const CFG = { region: 'Region', subregion: 'Subregion', name: 'Name' };
+      const CFG = {
+        region: 'Region',
+        subregion: 'Subregion',
+        name: 'Name',
+        iso: 'ISO-3',
+        link: 'Link',
+      };
       const state = { region: null, subregion: null };
 
       // Treats null, undefined and blank strings as missing
       const clean = (v) =>
         v == null || String(v).trim() === '' ? null : String(v).trim();
       const get = (f, key) => clean(f.properties?.[key]);
+
+      const hasLink = (f) => !!get(f, CFG.link);
 
       function regionHasSubregions(region) {
         return data.features.some(
@@ -252,7 +281,15 @@
           .attr('class', level === 2 ? 'shape static' : 'shape')
           .attr('d', path)
           .on('mouseenter', (e, d) => {
-            if (level === 2) return;
+            if (level === 2) {
+              if (!hasLink(d)) return; // only linked countries react
+              const iso = get(d, CFG.iso);
+              g.selectAll('.shape').classed(
+                'hl',
+                (x) => (iso ? get(x, CFG.iso) === iso : x === d) // every feature sharing the ISO-3
+              );
+              return;
+            }
             g.selectAll('.shape').classed(
               'hl',
               (x) => groupKey(x) === groupKey(d)
@@ -273,6 +310,45 @@
           .append('title')
           .text((d) => (level === 2 ? get(d, CFG.name) : groupKey(d)));
 
+        // One pin per ISO-3 group that has a link, placed on that group's largest shape
+        const pins =
+          level === 2
+            ? d3
+                .groups(feats, (f) => get(f, CFG.iso) ?? get(f, CFG.name))
+                .map(([k, fs]) => {
+                  const url = fs.map((f) => get(f, CFG.link)).find(Boolean);
+                  return url
+                    ? {
+                        url,
+                        xy: path.centroid(d3.greatest(fs, (f) => path.area(f))),
+                      }
+                    : null;
+                })
+                .filter((d) => d && d.xy.every(Number.isFinite))
+            : [];
+
+        const pinSel = g
+          .selectAll('a.pin')
+          .data(pins)
+          .join('a')
+          .attr('class', 'pin')
+          .attr('href', (d) => d.url)
+          .attr('target', '_blank')
+          .attr('rel', 'noopener');
+
+        pinSel
+          .append('rect')
+          .attr('x', -10)
+          .attr('y', -10)
+          .attr('width', 20)
+          .attr('height', 20);
+        pinSel.append('text').attr('class', 'label').text('🔎︎');
+
+        // keep pins a constant size while the map zooms
+        const placePins = (k) =>
+          pinSel.attr('transform', (d) => `translate(${d.xy}) scale(${1 / k})`);
+        placePins(1);
+
         const zoom = d3
           .zoom()
           .scaleExtent([1, 40])
@@ -282,6 +358,7 @@
           ])
           .on('zoom', (e) => {
             g.attr('transform', e.transform);
+            placePins(e.transform.k);
           });
         svg.call(zoom);
 
