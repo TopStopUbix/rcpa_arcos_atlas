@@ -10,6 +10,7 @@
 
       html,
       body {
+        height: 100%;
         margin: 0;
         background: #111;
         color: #e6edf3;
@@ -17,12 +18,14 @@
         font-size: 14px;
       }
       #wrap {
-        height: 600px;
+        height: 100vh;
         display: flex;
         flex-direction: column;
       }
       #map {
+        display: block;
         flex: 1;
+        min-height: 0;
         width: 100%;
       }
 
@@ -214,7 +217,7 @@
       // Optional per key. center is real-world [lon, lat] (west/south negative).
       // radius is degrees from the centre to the edge of the frame. roll spins the map.
       const FOCUS = {
-        AT: { center: [0, -90], radius: 35, roll: 0 }, 
+        AT: { center: [0, -90], radius: 35, roll: 0 },
       };
 
       function makeProjection(level, fc, width, height) {
