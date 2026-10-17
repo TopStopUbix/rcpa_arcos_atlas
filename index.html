@@ -8,7 +8,9 @@
         --link-color: yellow;
       }
 
-      html { overflow: hidden }
+      html {
+        overflow: hidden;
+      }
 
       html,
       body {
@@ -294,15 +296,21 @@
         // or: return centred(fc);   // use the geoCentroid approach for every region and subregion
       }
 
-      const BLURBS = {
-        EU: 'Testing first paragraph.\n\nSecond paragraph.',
-        EA: 'Testing first paragraph.\n\nSecond paragraph.',
-        VDT: 'Testing first paragraph.\n\nSecond paragraph.',
-        AF: 'The crown jewel of Central’s old guard: modern Africa is mostly constituted of various states and mandates, the strongest of which are mostly autonomous and democratic in governance. Here lies the breadbasket of Central, left untouched by former mismanagement with old colonies peacefully ceded by European opportunists hoping for colonialism to thrive under the RCPA’s watchful eyes. In the present day, conflict is mostly resolved via treaties and checks between colonialist and anticolonialist forces alike, with anomalous support systems and larger contraceptive availability helping transition Africa out of its tumultuous past. It is the shining example of the compromises of a brighter age, in which Central did more than throw bodies and anomalies at every problem, and in which wars could be won without ceaseless sacrifice and the grinding of ideals to disillusionment.',
-        AS: 'Testing first paragraph.\n\nSecond paragraph.',
-        OC: 'Testing first paragraph.\n\nSecond paragraph.',
-        AT: 'Testing first paragraph.\n\nSecond paragraph.',
-      };
+      let BLURBS = {};
+
+      function parseBlurbs(text) {
+        const out = {};
+        let key = null;
+        for (const line of text.split(/\r?\n/)) {
+          const m = line.match(/^#\s+(.+?)\s*$/);
+          if (m) {
+            key = m[1];
+            out[key] = [];
+          } else if (key) out[key].push(line);
+        }
+        for (const k in out) out[k] = out[k].join('\n').trim();
+        return out;
+      }
 
       function updateBlurb() {
         const box = d3.select('#blurb');
@@ -488,6 +496,13 @@
         .catch((err) =>
           showError('Failed to load data.geojson: ' + err.message)
         );
+
+      d3.text('blurbs.txt')
+        .then((t) => {
+          BLURBS = parseBlurbs(t);
+          if (data) draw(); // blurbs arrived after the map: redraw once
+        })
+        .catch(() => {}); // no file or a fetch error: the map still works, with no blurbs
     </script>
   </body>
 </html>
