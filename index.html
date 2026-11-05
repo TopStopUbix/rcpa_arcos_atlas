@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>D3 GeoJSON</title>
+    <title>RCPA D3 GeoJSON</title>
     <style>
       :root {
         --link-color: yellow;
@@ -43,7 +43,7 @@
         max-width: 100%;
         margin-top: 15px;
         padding-top: 5px;
-        padding-bottom: 16px;
+        padding-bottom: 12px;
         border-top: 1px solid #fff;
         line-height: 1.5;
       }
@@ -217,7 +217,7 @@
         el.style.display = 'block';
       }
 
-      // Left side lowercase (used by the code), right side must match your file's keys exactly
+      // Left side lowercase (used by the code), right side must match file's keys exactly
       const CFG = {
         region: 'Region',
         subregion: 'Subregion',
@@ -313,7 +313,7 @@
         });
       }
 
-      // Keys are Region or Subregion values, spelled exactly as in your file.
+      // Keys are Region or Subregion values.
       const OVERRIDES = {
         EU: () => d3.geoConicEquidistant().rotate([48, -10]),
         EU1: () => d3.geoConicConformal().rotate([15, -50]),
@@ -326,11 +326,11 @@
         AT: () => d3.geoAzimuthalEqualArea().rotate([45, 90]),
       };
 
-      // Optional per key. center is real-world [lon, lat] (west/south negative).
+      // Optional per key.
       // radius is degrees from the centre to the edge of the frame. roll spins the map.
       const FOCUS = {
         AT: { center: [0, -90], radius: 25, roll: 0 },
-        EU2: { center: [5, 46], radius: 11, roll: 0 },
+        EU2: { center: [5, 46], radius: 11, roll: -4 },
       };
 
       function makeProjection(level, fc, width, height) {
@@ -384,7 +384,6 @@
         return out;
       }
 
-      // Writes text into a parent node, turning [text]{.nund} into <span class="nund">text</span>
       function appendRich(parent, str) {
         const re = /\[((?:[^\[\]]|\[[^\[\]]*\])+)\]\{\.nund\}/g;
         let last = 0,
@@ -487,21 +486,13 @@
           .append('title')
           .text((d) => (level === 2 ? get(d, CFG.name) : groupKey(d)));
 
-        // One pin per ISO-3 group that has a link, placed on that group's largest shape
+        // pins
         const pins =
           level === 2
-            ? d3
-                .groups(feats, (f) => get(f, CFG.iso) ?? get(f, CFG.name))
-                .map(([k, fs]) => {
-                  const url = fs.map((f) => get(f, CFG.link)).find(Boolean);
-                  return url
-                    ? {
-                        url,
-                        xy: path.centroid(d3.greatest(fs, (f) => path.area(f))),
-                      }
-                    : null;
-                })
-                .filter((d) => d && d.xy.every(Number.isFinite))
+            ? feats
+                .filter(hasLink)
+                .map((f) => ({ url: get(f, CFG.link), xy: path.centroid(f) }))
+                .filter((d) => d.xy.every(Number.isFinite))
             : [];
 
         const pinSel = g
@@ -525,18 +516,18 @@
           pinSel.attr('transform', (d) => `translate(${d.xy}) scale(${1 / k})`);
         placePins(1);
 
-        const zoom = d3
-          .zoom()
-          .scaleExtent([1, 40])
-          .translateExtent([
-            [0, 0],
-            [width, height],
-          ])
-          .on('zoom', (e) => {
-            g.attr('transform', e.transform);
-            placePins(e.transform.k);
-          });
-        svg.call(zoom);
+        //const zoom = d3
+        //  .zoom()
+        //  .scaleExtent([1, 40])
+        //  .translateExtent([
+        //    [0, 0],
+        //    [width, height],
+        //  ])
+        //  .on('zoom', (e) => {
+        //    g.attr('transform', e.transform);
+        //    placePins(e.transform.k);
+        //  });
+        //svg.call(zoom);
 
         updateCrumbs();
         updateBlurb();
